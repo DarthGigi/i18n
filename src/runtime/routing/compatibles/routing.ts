@@ -4,8 +4,9 @@ import { hasProtocol, parsePath, parseQuery, withTrailingSlash, withoutTrailingS
 import { DEFAULT_DYNAMIC_PARAMS_KEY } from '#build/i18n.options.mjs'
 import { unref } from '#imports'
 
+import { getLocale } from '../../compatibility'
 import { resolve, routeToObject } from './utils'
-import { getLocale, getLocaleRouteName, getRouteName } from '../utils'
+import { getLocaleRouteName, getRouteName } from '../utils'
 import { extendPrefixable, extendSwitchLocalePathIntercepter, type CommonComposableOptions } from '../../utils'
 
 import type { Strategies, PrefixableOptions, SwitchLocalePathIntercepter } from '#build/i18n.options.mjs'
@@ -169,12 +170,14 @@ export function resolveRoute(common: CommonComposableOptions, route: RouteLocati
           defaultLocaleRouteNameSuffix
         }),
         // @ts-ignore
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- FIXME
         params: resolvedRoute.params,
         query: resolvedRoute.query,
         hash: resolvedRoute.hash
       } as RouteLocationNamedRaw
 
       // @ts-expect-error
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- FIXME
       localizedRoute.state = (resolvedRoute as ResolveV4).state
     } else {
       // if route has a path defined but no name, resolve full route using the path
@@ -222,7 +225,7 @@ function getLocalizableMetaFromDynamicParams(
   route: RouteLocationNormalizedLoaded
 ): Record<Locale, Record<string, unknown>> {
   if (common.runtimeConfig.public.i18n.experimental.switchLocalePathLinkSSR) {
-    return unref(common.metaState.value) as Record<Locale, any>
+    return unref(common.metaState.value)
   }
 
   const meta = route.meta || {}

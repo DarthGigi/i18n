@@ -1,41 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { isArray, isString, isObject } from '@intlify/shared'
-import { hasProtocol } from 'ufo'
+import { DEFAULT_COOKIE_KEY, isSSG, localeCodes, normalizedLocales, NUXT_I18N_MODULE_ID } from '#build/i18n.options.mjs'
+import { useNuxtApp, useCookie as useNuxtCookie, useRequestEvent, useRequestHeaders, useRuntimeConfig } from '#imports'
+import { isArray, isObject, isString } from '@intlify/shared'
 import isHTTPS from 'is-https'
-import {
-  useRequestHeaders,
-  useRequestEvent,
-  useCookie as useNuxtCookie,
-  useRuntimeConfig,
-  useNuxtApp,
-  unref
-} from '#imports'
-import { NUXT_I18N_MODULE_ID, DEFAULT_COOKIE_KEY, isSSG, localeCodes, normalizedLocales } from '#build/i18n.options.mjs'
-import { findBrowserLocale, getLocalesRegex, getI18nTarget } from './routing/utils'
+import { hasProtocol } from 'ufo'
+import { findBrowserLocale, getLocalesRegex } from './routing/utils'
 import { initCommonComposableOptions, type CommonComposableOptions } from './utils'
 
-import type { Locale } from 'vue-i18n'
 import type { DetectBrowserLanguageOptions, LocaleObject } from '#build/i18n.options.mjs'
-import type { RouteLocationNormalized, RouteLocationNormalizedLoaded } from 'vue-router'
 import type { CookieRef, NuxtApp } from 'nuxt/app'
+import type { Locale } from 'vue-i18n'
+import type { RouteLocationNormalized, RouteLocationNormalizedLoaded } from 'vue-router'
 import type { ModulePublicRuntimeConfig } from '../module'
 
 export function formatMessage(message: string) {
   return NUXT_I18N_MODULE_ID + ' ' + message
-}
-
-export function callVueI18nInterfaces(i18n: any, name: string, ...args: any[]): any {
-  const target = getI18nTarget(i18n)
-  // prettier-ignore
-  const [obj, method] = [target, (target as any)[name]]
-  return Reflect.apply(method, obj, [...args])
-}
-
-export function getVueI18nPropertyValue<Return = any>(i18n: any, name: string): Return {
-  const target = getI18nTarget(i18n)
-  // @ts-expect-error name should be typed instead of string
-  return unref(target[name]) as Return
 }
 
 export function defineGetter<K extends string | number | symbol, V>(obj: Record<K, V>, key: K, val: V) {
@@ -43,11 +23,12 @@ export function defineGetter<K extends string | number | symbol, V>(obj: Record<
 }
 
 type TailParameters<T> = T extends (first: CommonComposableOptions, ...rest: infer R) => unknown ? R : never
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export function wrapComposable<F extends (common: CommonComposableOptions, ...args: any[]) => any>(
   fn: F,
   common = initCommonComposableOptions()
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- FIXME
   return (...args: TailParameters<F>) => fn(common, ...args)
 }
 
@@ -232,7 +213,7 @@ export function detectBrowserLanguage(
       }
     } else if (redirectOn === 'no prefix') {
       __DEBUG__ && console.log('detectBrowserLanguage: no prefix (path) -', path)
-      if (!alwaysRedirect && path.match(getLocalesRegex(localeCodes as string[]))) {
+      if (!alwaysRedirect && path.match(getLocalesRegex(localeCodes))) {
         return { locale: '', stat: false, reason: 'not_redirect_on_no_prefix' }
       }
     }
@@ -293,7 +274,7 @@ export function detectBrowserLanguage(
       if (alwaysRedirect) {
         const redirectOnRoot = path === '/'
         const redirectOnAll = redirectOn === 'all'
-        const redirectOnNoPrefix = redirectOn === 'no prefix' && !path.match(getLocalesRegex(localeCodes as string[]))
+        const redirectOnNoPrefix = redirectOn === 'no prefix' && !path.match(getLocalesRegex(localeCodes))
         __DEBUG__ &&
           console.log(
             'detectBrowserLanguage: (redirectOnRoot, redirectOnAll, redirectOnNoPrefix) - ',
@@ -326,9 +307,9 @@ export function getHost(nuxtApp: NuxtApp) {
   } else if (import.meta.server) {
     const header = useRequestHeaders(['x-forwarded-host', 'host'])
 
-    let detectedHost: string | undefined
+    let detectedHost: string | string[] | undefined
     if (nuxtApp?.ssrContext?.event?.context.storeHost) {
-      detectedHost = nuxtApp?.ssrContext?.event?.context.storeHost
+      detectedHost = nuxtApp?.ssrContext?.event?.context.storeHost as string
     } else if ('x-forwarded-host' in header) {
       detectedHost = header['x-forwarded-host']
     } else if ('host' in header) {
@@ -457,8 +438,6 @@ export function getDomainFromLocale(localeCode: Locale): string | undefined {
   console.warn(formatMessage('Could not find domain name for locale ' + localeCode))
 }
 
-/* eslint-enable @typescript-eslint/no-explicit-any */
-
 export const runtimeDetectBrowserLanguage = (
   opts: ModulePublicRuntimeConfig['i18n'] = useRuntimeConfig().public.i18n
 ) => {
@@ -466,3 +445,5 @@ export const runtimeDetectBrowserLanguage = (
 
   return opts?.detectBrowserLanguage
 }
+
+/* eslint-enable @typescript-eslint/no-explicit-any */

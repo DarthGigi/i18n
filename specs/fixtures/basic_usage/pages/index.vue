@@ -58,7 +58,8 @@ route.meta.pageTransition = {
 }
 // @ts-ignore
 definePageMeta({
-  title: 'home'
+  title: 'home',
+  alias: ['/aliased-home-path']
 })
 
 const i18nHead = useLocaleHead({
@@ -96,6 +97,10 @@ useHead({
       <strong><code>useHead</code> with <code>useLocaleHead</code></strong
       >:
       <code id="home-use-locale-head">{{ i18nHead }}</code>
+    </section>
+    <section id="t-directive">
+      <p id="t-directive-path" v-t="'welcome'"></p>
+      <p id="t-directive-argument" v-t="{ path: 'helloMessage', args: { name: 'directive' } }"></p>
     </section>
     <section id="locale-path-usages">
       <h3>localePath</h3>

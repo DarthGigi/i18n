@@ -7,7 +7,7 @@ import { addServerPlugin, createResolver, resolvePath, useLogger } from '@nuxt/k
 import yamlPlugin from '@rollup/plugin-yaml'
 import json5Plugin from '@miyaneee/rollup-plugin-json5'
 import { getFeatureFlags } from './bundler'
-import { isExists } from './utils'
+import { getLayerI18n, isExists } from './utils'
 import {
   H3_PKG,
   UTILS_H3_PKG,
@@ -33,19 +33,21 @@ export async function setupNitro(
   nuxtOptions: Required<NuxtI18nOptions>,
   additionalParams: AdditionalSetupNitroParams
 ) {
-  const { resolve } = createResolver(import.meta.url)
+  const resolver = createResolver(import.meta.url)
   const [enableServerIntegration, localeDetectionPath] = await resolveLocaleDetectorPath(nuxt)
 
   nuxt.hook('nitro:config', async nitroConfig => {
     if (enableServerIntegration) {
       // inline module runtime in Nitro bundle
       nitroConfig.externals = defu(typeof nitroConfig.externals === 'object' ? nitroConfig.externals : {}, {
-        inline: [resolve('./runtime')]
+        inline: [resolver.resolve('./runtime')]
       })
 
       // install server resource transform plugin for yaml / json5 format
       nitroConfig.rollupConfig = nitroConfig.rollupConfig || {}
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME
       nitroConfig.rollupConfig.plugins = (await nitroConfig.rollupConfig.plugins) || []
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME
       nitroConfig.rollupConfig.plugins = isArray(nitroConfig.rollupConfig.plugins)
         ? nitroConfig.rollupConfig.plugins
         : [nitroConfig.rollupConfig.plugins]
@@ -83,18 +85,18 @@ export { localeDetector }
             ...h3UtilsExports.map(key => ({
               name: key,
               as: key,
-              from: resolve(nuxt.options.alias[UTILS_H3_PKG])
+              from: resolver.resolve(nuxt.options.alias[UTILS_H3_PKG])
             })),
             ...[NUXT_I18N_COMPOSABLE_DEFINE_LOCALE, NUXT_I18N_COMPOSABLE_DEFINE_CONFIG].map(key => ({
               name: key,
               as: key,
-              from: resolve('runtime/composables/shared')
+              from: resolver.resolve('runtime/composables/shared')
             })),
             ...[
               {
                 name: NUXT_I18N_COMPOSABLE_DEFINE_LOCALE_DETECTOR,
                 as: NUXT_I18N_COMPOSABLE_DEFINE_LOCALE_DETECTOR,
-                from: resolve('runtime/composables/server')
+                from: resolver.resolve('runtime/composables/server')
               }
             ]
           ]
@@ -109,10 +111,9 @@ export { localeDetector }
       nitroConfig.replace = assign(
         nitroConfig.replace,
         getFeatureFlags({
-          jit: nuxtOptions.compilation.jit,
           compositionOnly: nuxtOptions.bundle.compositionOnly,
           fullInstall: nuxtOptions.bundle.fullInstall,
-          dropMessageCompiler: nuxtOptions.compilation.jit ? nuxtOptions.bundle.dropMessageCompiler : false
+          dropMessageCompiler: nuxtOptions.bundle.dropMessageCompiler
         })
       )
     }
@@ -124,19 +125,22 @@ export { localeDetector }
 
   // add nitro plugin
   if (enableServerIntegration) {
-    await addServerPlugin(resolve('runtime/server/plugin'))
+    addServerPlugin(resolver.resolve('runtime/server/plugin'))
   }
 }
 
 async function resolveLocaleDetectorPath(nuxt: Nuxt) {
-  const serverI18nLayer = nuxt.options._layers.find(
-    l => l.config.i18n?.experimental?.localeDetector != null && l.config.i18n?.experimental?.localeDetector !== ''
-  )
+  const serverI18nLayer = nuxt.options._layers.find(l => {
+    const layerI18n = getLayerI18n(l)
+    return layerI18n?.experimental?.localeDetector != null && layerI18n?.experimental?.localeDetector !== ''
+  })
+
   let enableServerIntegration = serverI18nLayer != null
 
   if (serverI18nLayer != null) {
-    const pathTo = resolve(serverI18nLayer.config.rootDir, serverI18nLayer.config.i18n!.experimental!.localeDetector!)
-    const localeDetectorPath = await resolvePath(pathTo!, {
+    const serverI18nLayerConfig = getLayerI18n(serverI18nLayer)
+    const pathTo = resolve(serverI18nLayer.config.rootDir, serverI18nLayerConfig!.experimental!.localeDetector!)
+    const localeDetectorPath = await resolvePath(pathTo, {
       cwd: nuxt.options.rootDir,
       extensions: EXECUTABLE_EXTENSIONS
     })
